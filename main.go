@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
 	"net/http"
 )
 
 func fileHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	fileName := vars["file_name"]
-	fmt.Fprintf(w, "File Name: %s", fileName)
+	parmVars := ParamVars(r)
+	fmt.Println(parmVars)
+	fmt.Fprintf(w, "hello")
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
@@ -19,10 +18,12 @@ func index(w http.ResponseWriter, r *http.Request) {
 func main() {
 	r := CreateRouter()
 	r.addRoute("/home", index)
-	r.addRoute("/home/:somePath", index)
+	r.addRoute("/", index)
+	r.addRoute("/:hello", index)
+	r.addRoute("/home/:somePath", fileHandler)
 	r.addRoute("/file/:fileName/:somethingElse", fileHandler)
-	r.addRoute("/file/:fileName/geda/:somethingElse", fileHandler)
-	
+	r.addRoute("/file/:fileName/random/:somethingElse", fileHandler)
+
 	err := http.ListenAndServe(":8080", r)
 
 	if err != nil {
