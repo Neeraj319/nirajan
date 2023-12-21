@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	// "fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -75,11 +75,11 @@ func GetFunctionName(temp interface{}) string {
 	return strs[len(strs)-1]
 }
 
-func RemoveIndex(s []string, index int) []string {
+func removeIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
 
-func ValueIn(i int, dict map[string]int) bool {
+func valueIn(i int, dict map[string]int) bool {
 	for _, value := range dict {
 		if i == value {
 			return true
@@ -88,39 +88,39 @@ func ValueIn(i int, dict map[string]int) bool {
 	return false
 }
 
+func extractPath(urlArray []string, paramPosition PathMapping) string {
+	var path string
+	for i, value := range urlArray {
+		if valueIn(i, paramPosition.pathParams) {
+			continue
+		}
+		path += "/" + value
+	}
+	return path
+}
+
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
 	urlArray := strings.Split(url, "/")
 	urlArray = urlArray[1:]
 
 	var function HandlerFunction
-	var found bool
 	var finalPath string
 
 	for path, avialableParams := range r.routeMapping {
-		if found {
-			break
-		}
 		if path == url {
 			function = avialableParams[0].function
 			break
 		}
-
 		for _, paramPostion := range avialableParams {
-			if found {
+			finalPath = extractPath(urlArray, paramPostion)
+			if finalPath == path {
+				function = paramPostion.function
 				break
 			}
-			finalPath = ""
-			for i, value := range urlArray {
-				if ValueIn(i, paramPostion.pathParams) {
-					continue
-				}
-				finalPath += "/" + value
-			}
-			fmt.Printf("final path %s | %s \n", finalPath, path)
-			if strings.Compare(finalPath, path) == 0 {
-				function = paramPostion.function
-			}
+		}
+		if function != nil {
+			break
 		}
 
 	}
@@ -128,11 +128,4 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		function(w, req)
 	}
 
-}
-
-func ParamVars(req *http.Request) map[string]string {
-	path := req.URL.String()
-	params := make(map[string]string)
-	fmt.Println(path)
-	return params
 }

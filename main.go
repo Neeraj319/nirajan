@@ -6,14 +6,10 @@ import (
 )
 
 func fileHandler(w http.ResponseWriter, r *http.Request) {
-	parmVars := ParamVars(r)
-	fmt.Println(parmVars)
 	fmt.Fprintf(w, "file handler no random")
 }
 
 func fileHandler2(w http.ResponseWriter, r *http.Request) {
-	parmVars := ParamVars(r)
-	fmt.Println(parmVars)
 	fmt.Fprintf(w, "file handler with random")
 }
 func index(w http.ResponseWriter, r *http.Request) {
