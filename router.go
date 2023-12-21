@@ -52,23 +52,21 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction) {
 					continue
 				}
 				if value[0] == ':' {
-					// pathParamsNames = append(pathParamsNames, value[1:])
 					pathParam[value[1:]] = slashIndex
-					slashIndex++
 				} else {
 					pathName += "/" + value
 				}
+				slashIndex++
 			}
 			path = pathName
 		}
 	}
-	if path[len(path)-1] == '/' {
+	if path[len(path)-1] == '/' && len(path) != 1 {
 		path = path[:len(path)-1]
 	}
 	pathMapping.function = function
 	pathMapping.pathParams = pathParam
 	r.routeMapping[path] = append(r.routeMapping[path], *pathMapping)
-	fmt.Println(r.routeMapping)
 
 }
 
@@ -77,21 +75,59 @@ func GetFunctionName(temp interface{}) string {
 	return strs[len(strs)-1]
 }
 
-func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	var function HandlerFunction
-	path := req.URL.String()
-	mappings := r.routeMapping[path]
-	fmt.Println(path)
+func RemoveIndex(s []string, index int) []string {
+	return append(s[:index], s[index+1:]...)
+}
 
-	if len(mappings) == 0 && r.Response404 != nil {
-		default404Response(w, req)
-		return
+func ValueIn(i int, dict map[string]int) bool {
+	for _, value := range dict {
+		if i == value {
+			return true
+		}
 	}
-	fmt.Println(mappings)
-	if len(mappings) == 1 {
-		function = mappings[0].function
+	return false
+}
+
+func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	url := req.URL.String()
+	urlArray := strings.Split(url, "/")
+	urlArray = urlArray[1:]
+
+	var function HandlerFunction
+	var found bool
+	var finalPath string
+
+	for path, avialableParams := range r.routeMapping {
+		if found {
+			break
+		}
+		if path == url {
+			function = avialableParams[0].function
+			break
+		}
+
+		for _, paramPostion := range avialableParams {
+			if found {
+				break
+			}
+			finalPath = ""
+			for i, value := range urlArray {
+				if ValueIn(i, paramPostion.pathParams) {
+					continue
+				}
+				finalPath += "/" + value
+			}
+			fmt.Printf("final path %s | %s \n", finalPath, path)
+			if strings.Compare(finalPath, path) == 0 {
+				function = paramPostion.function
+			}
+		}
+
+	}
+	if function != nil {
 		function(w, req)
 	}
+
 }
 
 func ParamVars(req *http.Request) map[string]string {
