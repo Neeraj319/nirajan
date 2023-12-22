@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -102,9 +101,21 @@ func getSignleSlashFunction(params []PathMapping, urlArray []string) HandlerFunc
 	return function
 }
 
+func removeBlankStrings(array []string) []string {
+	var copyArray []string
+	for _, value := range array {
+		if value != "" {
+			copyArray = append(copyArray, value)
+		}
+	}
+	return copyArray
+
+}
+
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
-	urlArray := strings.Split(url, "/")[1:]
+	pathArray := strings.Split(url, "/")
+	pathArray = removeBlankStrings(pathArray)
 
 	var function HandlerFunction
 
@@ -124,16 +135,16 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		for _, param := range avialableParams {
-			finalPath := extractPath(urlArray, param)
+			finalPath := extractPath(pathArray, param)
 			if finalPath == path {
-				fmt.Println("final path", finalPath, urlArray, GetFunctionName(param.function))
 				function = param.function
 				break
 			}
 		}
-		if index == len(r.routeMapping)-1 && len(avialableParams) > 0 {
-			function = getSignleSlashFunction(slashMap, urlArray)
+		if index == len(r.routeMapping)-1 && function == nil {
+			function = getSignleSlashFunction(slashMap, pathArray)
 		}
+		index++
 	}
 	if function != nil {
 		function(w, req)
