@@ -1,6 +1,8 @@
 package main
 
 import (
+	// "fmt"
+	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -79,10 +81,10 @@ func valueIn(i int, dict map[string]int) bool {
 	return false
 }
 
-func extractPath(urlArray []string, paramPosition PathMapping) string {
+func extractPath(urlArray []string, param PathMapping) string {
 	var path string
 	for i, value := range urlArray {
-		if valueIn(i, paramPosition.pathParams) {
+		if valueIn(i, param.pathParams) {
 			continue
 		}
 		path += "/" + value
@@ -112,6 +114,31 @@ func removeBlankStrings(array []string) []string {
 
 }
 
+func mapKey(m map[string]int, value int) (key string, ok bool) {
+	for k, v := range m {
+		if v == value {
+			key = k
+			ok = true
+			return
+		}
+	}
+	return
+}
+
+func getParams(urlArray []string, param PathMapping) map[string]string {
+
+	paramValueMap := make(map[string]string)
+	for i, value := range urlArray {
+		if valueIn(i, param.pathParams) {
+			key, ok := mapKey(param.pathParams, i)
+			if ok {
+				paramValueMap[key] = value
+			}
+		}
+	}
+	return paramValueMap
+}
+
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
 	pathArray := strings.Split(url, "/")
@@ -123,25 +150,24 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var slashMap []PathMapping
 
 	for path, avialableParams := range r.routeMapping {
-		if path == url {
-			function = avialableParams[0].function
-			break
-		}
 		if function != nil {
 			break
 		}
-		if path == "/" && len(avialableParams) > 0 {
+		if path == "/" {
 			slashMap = avialableParams
 		}
 
 		for _, param := range avialableParams {
 			finalPath := extractPath(pathArray, param)
-			if finalPath == path {
+			paramValueMap := getParams(pathArray, param)
+			if finalPath == path && (len(paramValueMap) == len(param.pathParams)) {
+				fmt.Println(finalPath, paramValueMap, param.pathParams)
 				function = param.function
 				break
 			}
 		}
-		if index == len(r.routeMapping)-1 && function == nil {
+		if index == len(r.routeMapping)-1 && len(slashMap) > 0 {
+			fmt.Println("here")
 			function = getSignleSlashFunction(slashMap, pathArray)
 		}
 		index++

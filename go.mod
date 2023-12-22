@@ -1,4 +1,4 @@
-module basic_http
+module server
 
 go 1.21.4
 
