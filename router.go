@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "fmt"
+	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -17,6 +17,7 @@ func default404Response(w http.ResponseWriter, req *http.Request) {
 type PathMapping struct {
 	function   HandlerFunction
 	pathParams map[string]int
+	method     string
 }
 
 func CreatePathMapping() *PathMapping {
@@ -39,35 +40,26 @@ func CreateRouter() *SimpleRouter {
 func (r *SimpleRouter) addRoute(path string, function HandlerFunction) {
 	pathParam := make(map[string]int)
 	pathMapping := CreatePathMapping()
-	var slashIndex int
 	if strings.Contains(path, ":") {
-		pathParams := strings.Split(path, ":")
-		if len(pathParams) == 2 {
-			pathParam[pathParams[1]] = slashIndex
-			path = pathParams[0]
-		} else {
-			var pathName string = ""
-			for _, value := range strings.Split(path, "/") {
-				if value == "" {
-					continue
-				}
-				if value[0] == ':' {
-					pathParam[value[1:]] = slashIndex
-				} else {
-					pathName += "/" + value
-				}
-				slashIndex++
+		var pathName string = ""
+		for index, value := range strings.Split(path, "/") {
+			if value == "" {
+				continue
 			}
-			path = pathName
+			if value[0] == ':' {
+				pathParam[value[1:]] = index - 1
+			} else {
+				pathName += "/" + value
+			}
 		}
+		path = pathName
 	}
-	if path[len(path)-1] == '/' && len(path) != 1 {
-		path = path[:len(path)-1]
+	if path == "" {
+		path = "/"
 	}
 	pathMapping.function = function
 	pathMapping.pathParams = pathParam
 	r.routeMapping[path] = append(r.routeMapping[path], *pathMapping)
-
 }
 
 func GetFunctionName(temp interface{}) string {
@@ -99,33 +91,53 @@ func extractPath(urlArray []string, paramPosition PathMapping) string {
 	return path
 }
 
+func getSignleSlashFunction(params []PathMapping, urlArray []string) HandlerFunction {
+	var function HandlerFunction
+
+	for _, param := range params {
+		if len(urlArray) == len(param.pathParams) {
+			return param.function
+		}
+	}
+	return function
+}
+
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
-	urlArray := strings.Split(url, "/")
-	urlArray = urlArray[1:]
+	urlArray := strings.Split(url, "/")[1:]
 
 	var function HandlerFunction
-	var finalPath string
+
+	index := 0
+	var slashMap []PathMapping
 
 	for path, avialableParams := range r.routeMapping {
 		if path == url {
 			function = avialableParams[0].function
 			break
 		}
-		for _, paramPostion := range avialableParams {
-			finalPath = extractPath(urlArray, paramPostion)
-			if finalPath == path {
-				function = paramPostion.function
-				break
-			}
-		}
 		if function != nil {
 			break
 		}
+		if path == "/" && len(avialableParams) > 0 {
+			slashMap = avialableParams
+		}
 
+		for _, param := range avialableParams {
+			finalPath := extractPath(urlArray, param)
+			if finalPath == path {
+				fmt.Println("final path", finalPath, urlArray, GetFunctionName(param.function))
+				function = param.function
+				break
+			}
+		}
+		if index == len(r.routeMapping)-1 && len(avialableParams) > 0 {
+			function = getSignleSlashFunction(slashMap, urlArray)
+		}
 	}
 	if function != nil {
 		function(w, req)
+	} else {
+		default404Response(w, req)
 	}
-
 }
