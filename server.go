@@ -53,7 +53,8 @@ func main() {
 	r.addRoute("/file/:fileName/:anotherParam", FileNotRandom)
 	r.addRoute("/file/:fileName/random/:somethingElse", FileRandom)
 
-	err := http.ListenAndServe(":8080", r)
+	fmt.Println("Started listening on 0.0.0.0:8080")
+	err := http.ListenAndServe("0.0.0.0:8080", r)
 
 	if err != nil {
 		fmt.Printf("failed to start server: %s \n", err)
