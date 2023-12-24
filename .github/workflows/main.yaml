@@ -23,11 +23,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-buildx-
 
-    - name: Run Docker Compose
-      run: docker-compose up -d
-
     - name: Run tests
-      run: docker-compose run --rm <service_name> go test ./...
+      run: docker-compose run --rm <service_name> go test 
 
     - name: Shutdown
       run: docker-compose down
