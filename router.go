@@ -1,46 +1,71 @@
 package main
 
 import (
-	// "fmt"
-	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
 	"strings"
 )
 
+type HTTP_METHOD int
+
+func (me HTTP_METHOD) String() string {
+	methodNames := [...]string{
+		"POST",
+		"GET",
+		"HEAD",
+		"PUT",
+		"DELETE",
+		"CONNECT",
+		"OPTIONS",
+		"TRACE",
+		"PATCH",
+	}
+
+	if int(me) < len(methodNames) {
+		return methodNames[me]
+	}
+	return ""
+}
+
 type HandlerFunction func(w http.ResponseWriter, r *http.Request)
 
-func default404Response(w http.ResponseWriter, req *http.Request) {
+func default404Resp(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(404)
 }
 
-type PathMapping struct {
-	function   HandlerFunction
-	pathParams map[string]int
-	method     string
+func defaultMethodNotAllowedResp(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(405)
 }
 
-func CreatePathMapping() *PathMapping {
-	return &PathMapping{pathParams: make(map[string]int)}
+type RouteHandler struct {
+	function   HandlerFunction
+	pathParams map[string]int
+	method     HTTP_METHOD
+}
+
+func createRouteHandler(method HTTP_METHOD) *RouteHandler {
+	return &RouteHandler{pathParams: make(map[string]int), method: method}
 }
 
 type SimpleRouter struct {
-	routeMapping map[string][]PathMapping
-	Response404  HandlerFunction
+	routeMapping         map[string][]RouteHandler
+	NotFoundResp         HandlerFunction
+	MethodNotAllowedResp HandlerFunction
 }
 
 func CreateRouter() *SimpleRouter {
 	router := SimpleRouter{
-		routeMapping: make(map[string][]PathMapping),
-		Response404:  default404Response,
+		routeMapping:         make(map[string][]RouteHandler),
+		NotFoundResp:         default404Resp,
+		MethodNotAllowedResp: defaultMethodNotAllowedResp,
 	}
 	return &router
 }
 
-func (r *SimpleRouter) addRoute(path string, function HandlerFunction) {
-	pathParam := make(map[string]int)
-	pathMapping := CreatePathMapping()
+func (r *SimpleRouter) addRoute(path string, function HandlerFunction, method HTTP_METHOD) {
+	pathParams := make(map[string]int)
+	routeHandler := createRouteHandler(method)
 	if strings.Contains(path, ":") {
 		var pathName string = ""
 		for index, value := range strings.Split(path, "/") {
@@ -48,7 +73,7 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction) {
 				continue
 			}
 			if value[0] == ':' {
-				pathParam[value[1:]] = index - 1
+				pathParams[value[1:]] = index - 1
 			} else {
 				pathName += "/" + value
 			}
@@ -58,9 +83,9 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction) {
 	if path == "" {
 		path = "/"
 	}
-	pathMapping.function = function
-	pathMapping.pathParams = pathParam
-	r.routeMapping[path] = append(r.routeMapping[path], *pathMapping)
+	routeHandler.function = function
+	routeHandler.pathParams = pathParams
+	r.routeMapping[path] = append(r.routeMapping[path], *routeHandler)
 }
 
 func GetFunctionName(temp interface{}) string {
@@ -81,7 +106,7 @@ func valueIn(i int, dict map[string]int) bool {
 	return false
 }
 
-func extractPath(urlArray []string, param PathMapping) string {
+func extractPath(urlArray []string, param RouteHandler) string {
 	var path string
 	for i, value := range urlArray {
 		if valueIn(i, param.pathParams) {
@@ -92,15 +117,14 @@ func extractPath(urlArray []string, param PathMapping) string {
 	return path
 }
 
-func getSignleSlashFunction(params []PathMapping, urlArray []string) HandlerFunction {
-	var function HandlerFunction
+func getSingleSlashHandler(params []RouteHandler, urlArray []string) RouteHandler {
 
-	for _, param := range params {
-		if len(urlArray) == len(param.pathParams) {
-			return param.function
+	for _, routeHandlerObj := range params {
+		if len(urlArray) == len(routeHandlerObj.pathParams) {
+			return routeHandlerObj
 		}
 	}
-	return function
+	return RouteHandler{}
 }
 
 func removeBlankStrings(array []string) []string {
@@ -125,7 +149,7 @@ func mapKey(m map[string]int, value int) (key string, ok bool) {
 	return
 }
 
-func getParams(urlArray []string, param PathMapping) map[string]string {
+func getParams(urlArray []string, param RouteHandler) map[string]string {
 
 	paramValueMap := make(map[string]string)
 	for i, value := range urlArray {
@@ -144,37 +168,37 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	pathArray := strings.Split(url, "/")
 	pathArray = removeBlankStrings(pathArray)
 
-	var function HandlerFunction
-
 	index := 0
-	var slashMap []PathMapping
+	var slashMap []RouteHandler
+	var routeHandler RouteHandler
 
-	for path, avialableParams := range r.routeMapping {
-		if function != nil {
+	for pathString, routeHandlers := range r.routeMapping {
+		if routeHandler.function != nil {
 			break
 		}
-		if path == "/" {
-			slashMap = avialableParams
+		if pathString == "/" {
+			slashMap = routeHandlers
 		}
 
-		for _, param := range avialableParams {
-			finalPath := extractPath(pathArray, param)
-			paramValueMap := getParams(pathArray, param)
-			if finalPath == path && (len(paramValueMap) == len(param.pathParams)) {
-				fmt.Println(finalPath, paramValueMap, param.pathParams)
-				function = param.function
+		for _, routeObj := range routeHandlers {
+			finalPath := extractPath(pathArray, routeObj)
+			paramValueMap := getParams(pathArray, routeObj)
+			if finalPath == pathString && (len(paramValueMap) == len(routeObj.pathParams)) {
+				routeHandler = routeObj
 				break
 			}
 		}
 		if index == len(r.routeMapping)-1 && len(slashMap) > 0 {
-			fmt.Println("here")
-			function = getSignleSlashFunction(slashMap, pathArray)
+			routeHandler = getSingleSlashHandler(slashMap, pathArray)
 		}
 		index++
 	}
-	if function != nil {
-		function(w, req)
+	if routeHandler.function != nil {
+		if routeHandler.method.String() != req.Method {
+			r.MethodNotAllowedResp(w, req)
+		}
+		routeHandler.function(w, req)
 	} else {
-		default404Response(w, req)
+		r.NotFoundResp(w, req)
 	}
 }
