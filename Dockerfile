@@ -12,4 +12,4 @@ RUN go mod download
 
 COPY . .
 
-ENTRYPOINT ["go", "run", "."]
+CMD ["go", "run", "."]
