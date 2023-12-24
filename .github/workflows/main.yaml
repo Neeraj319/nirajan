@@ -24,7 +24,7 @@ jobs:
           ${{ runner.os }}-buildx-
 
     - name: Run tests
-      run: docker-compose run --rm <service_name> go test 
+      run: docker-compose run --rm server go test 
 
     - name: Shutdown
       run: docker-compose down
