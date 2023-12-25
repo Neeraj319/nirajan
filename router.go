@@ -9,6 +9,18 @@ import (
 
 type HTTP_METHOD int
 
+const (
+	POST HTTP_METHOD = iota
+	GET
+	HEAD
+	PUT
+	DELETE
+	CONNECT
+	OPTIONS
+	TRACE
+	PATCH
+)
+
 func (me HTTP_METHOD) String() string {
 	methodNames := [...]string{
 		"POST",
