@@ -41,9 +41,14 @@ func RandomWithParams(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "/random/:params")
 }
 
+func HomePost(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "home post")
+}
+
 func main() {
 	r := CreateRouter()
 	r.addRoute("/home", Home, GET)
+	r.addRoute("/home", HomePost, POST)
 	r.addRoute("/", Index, GET)
 	r.addRoute("/:anyParam", Hello, POST)
 	r.addRoute("/home/:somePath", HomeSomePath, PATCH)

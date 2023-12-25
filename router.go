@@ -180,37 +180,43 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	pathArray := strings.Split(url, "/")
 	pathArray = removeBlankStrings(pathArray)
 
-	index := 0
 	var slashMap []RouteHandler
-	var routeHandler RouteHandler
+	var possibleRouteHandlers []RouteHandler
 
 	for pathString, routeHandlers := range r.routeMapping {
-		if routeHandler.function != nil {
+		if len(possibleRouteHandlers) != 0 {
 			break
 		}
 		if pathString == "/" {
 			slashMap = routeHandlers
+			continue
 		}
 
 		for _, routeObj := range routeHandlers {
 			finalPath := extractPath(pathArray, routeObj)
 			paramValueMap := getParams(pathArray, routeObj)
 			if finalPath == pathString && (len(paramValueMap) == len(routeObj.pathParams)) {
-				routeHandler = routeObj
-				break
+				possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
 			}
 		}
-		if index == len(r.routeMapping)-1 && len(slashMap) > 0 {
-			routeHandler = getSingleSlashHandler(slashMap, pathArray)
-		}
-		index++
 	}
-	if routeHandler.function != nil {
-		if routeHandler.method.String() != req.Method {
-			r.MethodNotAllowedResp(w, req)
-		}
-		routeHandler.function(w, req)
-	} else {
+	/*
+		if there are routes with only "/" and if route is not found then check in "/" routes
+		for this only check for the length of the param
+	*/
+
+	if len(possibleRouteHandlers) == 0 && len(slashMap) > 0 {
+		possibleRouteHandlers = append(possibleRouteHandlers, getSingleSlashHandler(slashMap, pathArray))
+	}
+	if len(possibleRouteHandlers) == 0 {
 		r.NotFoundResp(w, req)
+		return
 	}
+	for _, routeObj := range possibleRouteHandlers {
+		if routeObj.method.String() == req.Method {
+			routeObj.function(w, req)
+			return
+		}
+	}
+	r.MethodNotAllowedResp(w, req)
 }
