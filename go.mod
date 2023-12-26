@@ -15,6 +15,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-siris/siris v7.4.0+incompatible // indirect
 	github.com/gohugoio/hugo v0.111.3 // indirect
+	github.com/gorilla/schema v1.2.1 // indirect
 	github.com/labstack/echo v3.3.10+incompatible // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

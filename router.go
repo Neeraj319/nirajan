@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -51,33 +52,33 @@ func defaultMethodNotAllowedResp(w http.ResponseWriter, req *http.Request) {
 }
 
 type RouteHandler struct {
-	function   HandlerFunction
-	pathParams map[string]int
-	method     HTTP_METHOD
+	pathParams  map[string]int
+	route       string
+	http_method HTTP_METHOD
 }
 
-func createRouteHandler(method HTTP_METHOD) *RouteHandler {
-	return &RouteHandler{pathParams: make(map[string]int), method: method}
+func createRouteHandler(http_method HTTP_METHOD) *RouteHandler {
+	return &RouteHandler{pathParams: make(map[string]int), http_method: http_method}
 }
 
 type SimpleRouter struct {
-	routeMapping         map[string][]RouteHandler
+	routeMapping         map[*RouteHandler]HandlerFunction
 	NotFoundResp         HandlerFunction
 	MethodNotAllowedResp HandlerFunction
 }
 
 func CreateRouter() *SimpleRouter {
 	router := SimpleRouter{
-		routeMapping:         make(map[string][]RouteHandler),
+		routeMapping:         make(map[*RouteHandler]HandlerFunction),
 		NotFoundResp:         default404Resp,
 		MethodNotAllowedResp: defaultMethodNotAllowedResp,
 	}
 	return &router
 }
 
-func (r *SimpleRouter) addRoute(path string, function HandlerFunction, method HTTP_METHOD) {
+func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_method HTTP_METHOD) {
 	pathParams := make(map[string]int)
-	routeHandler := createRouteHandler(method)
+	routeHandler := createRouteHandler(http_method)
 	if strings.Contains(path, ":") {
 		var pathName string = ""
 		for index, value := range strings.Split(path, "/") {
@@ -95,9 +96,9 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction, method HT
 	if path == "" {
 		path = "/"
 	}
-	routeHandler.function = function
 	routeHandler.pathParams = pathParams
-	r.routeMapping[path] = append(r.routeMapping[path], *routeHandler)
+	routeHandler.route = path
+	r.routeMapping[routeHandler] = function
 }
 
 func GetFunctionName(temp interface{}) string {
@@ -118,7 +119,7 @@ func valueIn(i int, dict map[string]int) bool {
 	return false
 }
 
-func extractPath(urlArray []string, param RouteHandler) string {
+func extractPath(urlArray []string, param *RouteHandler) string {
 	var path string
 	for i, value := range urlArray {
 		if valueIn(i, param.pathParams) {
@@ -129,14 +130,14 @@ func extractPath(urlArray []string, param RouteHandler) string {
 	return path
 }
 
-func getSingleSlashHandler(params []RouteHandler, urlArray []string) RouteHandler {
+func getSingleSlashHandler(params []*RouteHandler, urlArray []string) (*RouteHandler, bool) {
 
 	for _, routeHandlerObj := range params {
 		if len(urlArray) == len(routeHandlerObj.pathParams) {
-			return routeHandlerObj
+			return routeHandlerObj, true
 		}
 	}
-	return RouteHandler{}
+	return &RouteHandler{}, false
 }
 
 func removeBlankStrings(array []string) []string {
@@ -161,7 +162,7 @@ func mapKey(m map[string]int, value int) (key string, ok bool) {
 	return
 }
 
-func getParams(urlArray []string, param RouteHandler) map[string]string {
+func getParams(urlArray []string, param *RouteHandler) map[string]string {
 
 	paramValueMap := make(map[string]string)
 	for i, value := range urlArray {
@@ -180,24 +181,19 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	pathArray := strings.Split(url, "/")
 	pathArray = removeBlankStrings(pathArray)
 
-	var slashMap []RouteHandler
-	var possibleRouteHandlers []RouteHandler
+	var slashMap []*RouteHandler
+	var possibleRouteHandlers []*RouteHandler
 
-	for pathString, routeHandlers := range r.routeMapping {
-		if len(possibleRouteHandlers) != 0 {
-			break
-		}
-		if pathString == "/" {
-			slashMap = routeHandlers
+	for routeObj := range r.routeMapping {
+		if routeObj.route == "/" {
+			slashMap = append(slashMap, routeObj)
 			continue
 		}
 
-		for _, routeObj := range routeHandlers {
-			finalPath := extractPath(pathArray, routeObj)
-			paramValueMap := getParams(pathArray, routeObj)
-			if finalPath == pathString && (len(paramValueMap) == len(routeObj.pathParams)) {
-				possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
-			}
+		finalPath := extractPath(pathArray, routeObj)
+		paramValueMap := getParams(pathArray, routeObj)
+		if finalPath == routeObj.route && (len(paramValueMap) == len(routeObj.pathParams)) {
+			possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
 		}
 	}
 	/*
@@ -206,15 +202,18 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	*/
 
 	if len(possibleRouteHandlers) == 0 && len(slashMap) > 0 {
-		possibleRouteHandlers = append(possibleRouteHandlers, getSingleSlashHandler(slashMap, pathArray))
+		routeObj, ok := getSingleSlashHandler(slashMap, pathArray)
+		if ok {
+			possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
+		}
 	}
 	if len(possibleRouteHandlers) == 0 {
 		r.NotFoundResp(w, req)
 		return
 	}
 	for _, routeObj := range possibleRouteHandlers {
-		if routeObj.method.String() == req.Method {
-			routeObj.function(w, req)
+		if routeObj.http_method.String() == req.Method {
+			r.routeMapping[routeObj](w, req)
 			return
 		}
 	}
