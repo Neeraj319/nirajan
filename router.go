@@ -163,14 +163,15 @@ func extractPath(urlArray []string, param *RouteHandler) string {
 	return path
 }
 
-func getSingleSlashHandler(params []*RouteHandler, urlArray []string) (*RouteHandler, bool) {
+func getSingleSlashHandlers(params []*RouteHandler, urlArray []string) []*RouteHandler {
 
+	routeHandlers := make([]*RouteHandler, 0)
 	for _, routeHandlerObj := range params {
 		if len(urlArray) == len(routeHandlerObj.pathParams) {
-			return routeHandlerObj, true
+			routeHandlers = append(routeHandlers, routeHandlerObj)
 		}
 	}
-	return &RouteHandler{}, false
+	return routeHandlers
 }
 
 func removeBlankStrings(array []string) []string {
@@ -235,17 +236,13 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	*/
 
 	if len(possibleRouteHandlers) == 0 && len(slashMap) > 0 {
-		routeObj, ok := getSingleSlashHandler(slashMap, pathArray)
-		if ok {
-			possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
-		}
+		possibleRouteHandlers = getSingleSlashHandlers(slashMap, pathArray)
 	}
 	if len(possibleRouteHandlers) == 0 {
 		r.NotFoundResp(w, req)
 		return
 	}
 	for _, routeObj := range possibleRouteHandlers {
-		fmt.Println("possible", routeObj.http_method, routeObj.route, routeObj.pathParams)
 		if routeObj.http_method.String() == req.Method {
 			r.routeMapping[routeObj](w, req)
 			return

@@ -32,10 +32,13 @@ func HomeSomePath(w http.ResponseWriter, r *http.Request) {
 func HomeSomePathPatch(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "/home/:somePath, patch")
 }
-func Hello(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "/:anyParam")
+func HelloPost(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "/:anyParam, post")
 }
 
+func HelloPatch(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "/:anyParam, Patch")
+}
 func Random(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "/random")
 }
@@ -55,8 +58,8 @@ func main() {
 	r.addRoute("/home", Random, POST)
 	r.addRoute("/home", HomePost, POST)
 	r.addRoute("/", Index, GET)
-	r.addRoute("/:anyParam", Hello, POST)
-	r.addRoute("/:anyParam", Hello, GET)
+	r.addRoute("/:anyParam", HelloPost, POST)
+	r.addRoute("/:anyParam", HelloPatch, PATCH)
 	r.addRoute("/home/:somePath", HomeSomePath, POST)
 	r.addRoute("/home/:somePath", HomeSomePathPatch, PATCH)
 	r.addRoute("/random", Random, PATCH)
@@ -68,11 +71,6 @@ func main() {
 	r.addRoute("/file/:fileName/random/:somethingElse", FileRandom, TRACE)
 
 	fmt.Println("Started listening on 0.0.0.0:8080")
-	for routeHandler, function := range r.routeMapping {
-		fmt.Printf("%s, %v, %s, %s\n",
-			routeHandler.route, routeHandler.pathParams, routeHandler.http_method, GetFunctionName(function))
-	}
-	fmt.Println("------------------------------->")
 	err := http.ListenAndServe("0.0.0.0:8080", r)
 
 	if err != nil {
