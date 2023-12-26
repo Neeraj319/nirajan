@@ -2,6 +2,7 @@ package main
 
 import (
 	// "fmt"
+	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -51,6 +52,15 @@ func defaultMethodNotAllowedResp(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(405)
 }
 
+func valueIn(i int, dict map[string]int) bool {
+	for _, value := range dict {
+		if i == value {
+			return true
+		}
+	}
+	return false
+}
+
 type RouteHandler struct {
 	pathParams  map[string]int
 	route       string
@@ -76,6 +86,37 @@ func CreateRouter() *SimpleRouter {
 	return &router
 }
 
+func removeSimilarRoute(r *map[*RouteHandler]HandlerFunction, routeHandler RouteHandler) {
+	actualMap := *r
+	keysToDelete := make([]*RouteHandler, 0)
+
+	for routeObj := range actualMap {
+		if isRouteSimilar(routeObj, routeHandler) {
+			keysToDelete = append(keysToDelete, routeObj)
+		}
+	}
+
+	for _, key := range keysToDelete {
+		delete(actualMap, key)
+	}
+}
+
+func isRouteSimilar(routeObj *RouteHandler, routeHandler RouteHandler) bool {
+	return routeObj.route == routeHandler.route &&
+		routeObj.http_method == routeHandler.http_method &&
+		len(routeObj.pathParams) == len(routeHandler.pathParams) &&
+		areAllParamsPresent(routeObj.pathParams, routeHandler.pathParams)
+}
+
+func areAllParamsPresent(objParams map[string]int, handlerParams map[string]int) bool {
+	for _, param := range objParams {
+		if !valueIn(param, handlerParams) {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_method HTTP_METHOD) {
 	pathParams := make(map[string]int)
 	routeHandler := createRouteHandler(http_method)
@@ -98,6 +139,7 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_meth
 	}
 	routeHandler.pathParams = pathParams
 	routeHandler.route = path
+	removeSimilarRoute(&r.routeMapping, *routeHandler)
 	r.routeMapping[routeHandler] = function
 }
 
@@ -108,15 +150,6 @@ func GetFunctionName(temp interface{}) string {
 
 func removeIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
-}
-
-func valueIn(i int, dict map[string]int) bool {
-	for _, value := range dict {
-		if i == value {
-			return true
-		}
-	}
-	return false
 }
 
 func extractPath(urlArray []string, param *RouteHandler) string {
@@ -212,6 +245,7 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	for _, routeObj := range possibleRouteHandlers {
+		fmt.Println("possible", routeObj.http_method, routeObj.route, routeObj.pathParams)
 		if routeObj.http_method.String() == req.Method {
 			r.routeMapping[routeObj](w, req)
 			return
