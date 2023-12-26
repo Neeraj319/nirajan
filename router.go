@@ -2,7 +2,6 @@ package main
 
 import (
 	// "fmt"
-	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -210,15 +209,10 @@ func getParams(urlArray []string, param *RouteHandler) map[string]string {
 	return paramValueMap
 }
 
-func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	url := req.URL.String()
-	pathArray := strings.Split(url, "/")
-	pathArray = removeBlankStrings(pathArray)
-
+func getPossibleRouteHandlers(routeMapping map[*RouteHandler]HandlerFunction, pathArray []string) []*RouteHandler {
 	var slashMap []*RouteHandler
 	var possibleRouteHandlers []*RouteHandler
-
-	for routeObj := range r.routeMapping {
+	for routeObj := range routeMapping {
 		if routeObj.route == "/" {
 			slashMap = append(slashMap, routeObj)
 			continue
@@ -230,6 +224,7 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
 		}
 	}
+
 	/*
 		if there are routes with only "/" and if route is not found then check in "/" routes
 		for this only check for the length of the param
@@ -238,6 +233,16 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if len(possibleRouteHandlers) == 0 && len(slashMap) > 0 {
 		possibleRouteHandlers = getSingleSlashHandlers(slashMap, pathArray)
 	}
+	return possibleRouteHandlers
+}
+
+func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	url := req.URL.String()
+	pathArray := strings.Split(url, "/")
+	pathArray = removeBlankStrings(pathArray)
+
+	possibleRouteHandlers := getPossibleRouteHandlers(r.routeMapping, pathArray)
+
 	if len(possibleRouteHandlers) == 0 {
 		r.NotFoundResp(w, req)
 		return
