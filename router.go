@@ -2,6 +2,8 @@ package main
 
 import (
 	// "fmt"
+	"fmt"
+	"github.com/gorilla/schema"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -22,6 +24,8 @@ const (
 	PATCH
 )
 
+var decoder = schema.NewDecoder()
+
 func (me HTTP_METHOD) String() string {
 	methodNames := [...]string{
 		"POST",
@@ -41,7 +45,8 @@ func (me HTTP_METHOD) String() string {
 	return ""
 }
 
-type HandlerFunction func(w http.ResponseWriter, r *http.Request)
+type HandlerFunctionPathParams func(w http.ResponseWriter, r *http.Request, paramsStruct interface{})
+type HandlerFunctionNoPathParams func(w http.ResponseWriter, r *http.Request)
 
 func default404Resp(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(404)
@@ -49,15 +54,6 @@ func default404Resp(w http.ResponseWriter, req *http.Request) {
 
 func defaultMethodNotAllowedResp(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(405)
-}
-
-func valueIn(i int, dict map[string]int) bool {
-	for _, value := range dict {
-		if i == value {
-			return true
-		}
-	}
-	return false
 }
 
 type RouteHandler struct {
@@ -71,21 +67,21 @@ func createRouteHandler(http_method HTTP_METHOD) *RouteHandler {
 }
 
 type SimpleRouter struct {
-	routeMapping         map[*RouteHandler]HandlerFunction
-	NotFoundResp         HandlerFunction
-	MethodNotAllowedResp HandlerFunction
+	routeMapping         map[*RouteHandler]interface{}
+	NotFoundResp         HandlerFunctionNoPathParams
+	MethodNotAllowedResp HandlerFunctionNoPathParams
 }
 
 func CreateRouter() *SimpleRouter {
 	router := SimpleRouter{
-		routeMapping:         make(map[*RouteHandler]HandlerFunction),
+		routeMapping:         make(map[*RouteHandler]interface{}),
 		NotFoundResp:         default404Resp,
 		MethodNotAllowedResp: defaultMethodNotAllowedResp,
 	}
 	return &router
 }
 
-func removeSimilarRoute(r *map[*RouteHandler]HandlerFunction, routeHandler RouteHandler) {
+func removeSimilarRoute(r *map[*RouteHandler]interface{}, routeHandler RouteHandler) {
 	actualMap := *r
 	keysToDelete := make([]*RouteHandler, 0)
 
@@ -100,6 +96,14 @@ func removeSimilarRoute(r *map[*RouteHandler]HandlerFunction, routeHandler Route
 	}
 }
 
+func valueIn(i int, dict map[string]int) bool {
+	for _, value := range dict {
+		if i == value {
+			return true
+		}
+	}
+	return false
+}
 func isRouteSimilar(routeObj *RouteHandler, routeHandler RouteHandler) bool {
 	return routeObj.route == routeHandler.route &&
 		routeObj.http_method == routeHandler.http_method &&
@@ -116,7 +120,46 @@ func areAllParamsPresent(objParams map[string]int, handlerParams map[string]int)
 	return true
 }
 
-func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_method HTTP_METHOD) {
+func validateHanlder(function interface{}) {
+	v := reflect.TypeOf(function)
+	if v.Kind() != reflect.Func {
+		panic("param: function (must be of function type)")
+	}
+
+	validateHandlerParams(function)
+}
+
+func validateHandlerParams(function interface{}) {
+	functionName := GetFunctionName(function)
+
+	v := reflect.TypeOf(function)
+
+	_, file, line, _ := runtime.Caller(1)
+
+	errorTemplate := "[%s:%d] %s: %s"
+
+	if !(v.NumIn() == 3 || v.NumIn() == 2) {
+		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler function params must be 2 or 3"))
+	}
+
+	if v.In(0).Kind() != reflect.Interface || v.In(0).String() != "http.ResponseWriter" {
+		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler first argument must be of type `http.ResponseWriter`"))
+	}
+
+	if v.In(1).Kind() != reflect.Ptr || v.In(1).Elem().String() != "http.Request" {
+		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler second argument must be a pointer to `http.Request`"))
+	}
+
+	if v.NumIn() == 3 && v.In(2).Kind() != reflect.Struct {
+		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler third argument must be a struct"))
+	}
+}
+
+func validateHandlerStruct() {
+
+}
+
+func (r *SimpleRouter) addRoute(path string, function interface{}, http_method HTTP_METHOD) {
 	pathParams := make(map[string]int)
 	routeHandler := createRouteHandler(http_method)
 	if strings.Contains(path, ":") {
@@ -136,6 +179,9 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_meth
 	if path == "" {
 		path = "/"
 	}
+
+	validateHanlder(function)
+
 	routeHandler.pathParams = pathParams
 	routeHandler.route = path
 	removeSimilarRoute(&r.routeMapping, *routeHandler)
@@ -143,8 +189,7 @@ func (r *SimpleRouter) addRoute(path string, function HandlerFunction, http_meth
 }
 
 func GetFunctionName(temp interface{}) string {
-	strs := strings.Split((runtime.FuncForPC(reflect.ValueOf(temp).Pointer()).Name()), ".")
-	return strs[len(strs)-1]
+	return runtime.FuncForPC(reflect.ValueOf(temp).Pointer()).Name()
 }
 
 func removeIndex(s []string, index int) []string {
@@ -195,21 +240,20 @@ func mapKey(m map[string]int, value int) (key string, ok bool) {
 	return
 }
 
-func getParams(urlArray []string, param *RouteHandler) map[string]string {
-
-	paramValueMap := make(map[string]string)
+func getParams(urlArray []string, paramIndex map[string]int) map[string][]string {
+	paramValueMap := make(map[string][]string)
 	for i, value := range urlArray {
-		if valueIn(i, param.pathParams) {
-			key, ok := mapKey(param.pathParams, i)
+		if valueIn(i, paramIndex) {
+			key, ok := mapKey(paramIndex, i)
 			if ok {
-				paramValueMap[key] = value
+				paramValueMap[key] = append(paramValueMap[key], value)
 			}
 		}
 	}
 	return paramValueMap
 }
 
-func getPossibleRouteHandlers(routeMapping map[*RouteHandler]HandlerFunction, pathArray []string) []*RouteHandler {
+func getPossibleRouteHandlers(routeMapping map[*RouteHandler]interface{}, pathArray []string) []*RouteHandler {
 	var slashMap []*RouteHandler
 	var possibleRouteHandlers []*RouteHandler
 	for routeObj := range routeMapping {
@@ -219,7 +263,7 @@ func getPossibleRouteHandlers(routeMapping map[*RouteHandler]HandlerFunction, pa
 		}
 
 		finalPath := extractPath(pathArray, routeObj)
-		paramValueMap := getParams(pathArray, routeObj)
+		paramValueMap := getParams(pathArray, routeObj.pathParams)
 		if finalPath == routeObj.route && (len(paramValueMap) == len(routeObj.pathParams)) {
 			possibleRouteHandlers = append(possibleRouteHandlers, routeObj)
 		}
@@ -236,6 +280,25 @@ func getPossibleRouteHandlers(routeMapping map[*RouteHandler]HandlerFunction, pa
 	return possibleRouteHandlers
 }
 
+func callHandler(handler interface{}, pathArray []string, handerObj *RouteHandler, defaultArgs []reflect.Value) {
+	typeFunction := reflect.TypeOf(handler)
+	function := reflect.ValueOf(handler)
+	switch typeFunction.NumIn() {
+	case 2:
+		function.Call(defaultArgs)
+		return
+	case 3:
+		params := getParams(pathArray, handerObj.pathParams)
+
+		v := reflect.New(typeFunction.In(2))
+		decoder.Decode(v.Interface(), params)
+
+		args := append(defaultArgs, v.Elem())
+		function.Call(args)
+		return
+	}
+}
+
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
 	pathArray := strings.Split(url, "/")
@@ -249,7 +312,12 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	for _, routeObj := range possibleRouteHandlers {
 		if routeObj.http_method.String() == req.Method {
-			r.routeMapping[routeObj](w, req)
+			function := r.routeMapping[routeObj]
+			args := []reflect.Value{
+				reflect.ValueOf(w),
+				reflect.ValueOf(req),
+			}
+			callHandler(function, pathArray, routeObj, args)
 			return
 		}
 	}
