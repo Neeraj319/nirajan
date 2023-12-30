@@ -169,7 +169,7 @@ func validateHandlerParamStructAttrs(function interface{}, pathParams map[string
 	}
 }
 
-func (r *SimpleRouter) addRoute(path string, function interface{}, http_method HTTP_METHOD) {
+func (r *SimpleRouter) AddRoute(path string, function interface{}, http_method HTTP_METHOD) {
 	pathParams := make(map[string]int)
 	routeHandler := createRouteHandler(http_method)
 
