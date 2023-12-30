@@ -3,6 +3,7 @@ package nirajan
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -334,4 +335,9 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	r.MethodNotAllowedResp(w, req)
+}
+
+func QueryParams(req *http.Request) map[string][]string {
+	u, _ := url.Parse(req.URL.String())
+	return u.Query()
 }
