@@ -176,7 +176,6 @@ func (r *SimpleRouter) AddRoute(path string, function interface{}, http_method H
 
 	var pathName string
 	if strings.Contains(path, ":") {
-		var pathName string = ""
 		for index, value := range strings.Split(path, "/") {
 			if value == "" {
 				continue
