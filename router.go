@@ -174,7 +174,7 @@ func (r *SimpleRouter) AddRoute(path string, function interface{}, http_method H
 	pathParams := make(map[string]int)
 	routeHandler := createRouteHandler(http_method)
 
-	var pathName string
+	var pathName string = ""
 	if strings.Contains(path, ":") {
 		for index, value := range strings.Split(path, "/") {
 			if value == "" {
@@ -187,7 +187,7 @@ func (r *SimpleRouter) AddRoute(path string, function interface{}, http_method H
 			}
 		}
 	}
-	if path == "" {
+	if path == "" || pathName == "" {
 		pathName = "/"
 	}
 
@@ -324,6 +324,7 @@ func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	for _, routeObj := range possibleRouteHandlers {
 		if routeObj.http_method.String() == req.Method {
+			// fmt.Println("route", routeObj.route, routeObj.pathParams, url)
 			function := r.routeMapping[routeObj]
 			args := []reflect.Value{
 				reflect.ValueOf(w),
