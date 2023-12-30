@@ -5,13 +5,14 @@ Another router for the net/http module
 
 ## Get Started
 
-```go
+```golang
 package main
 
 import (
 	"fmt"
-	"github.com/Neeraj319/nirajan"
 	"net/http"
+
+	"github.com/Neeraj319/nirajan"
 )
 
 type Params struct {
@@ -24,9 +25,9 @@ func Home(w http.ResponseWriter, r *http.Request, params Params) {
 	fmt.Fprintf(w, response_string)
 }
 
-
 func Index(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "index response")
+	fmt.Println(nirajan.QueryParams(r))
+	fmt.Fprintf(w, "index response")
 }
 
 func main() {
@@ -34,8 +35,8 @@ func main() {
 	r.AddRoute("/:Name/:Age", Home, nirajan.GET)
 	r.AddRoute("/", Index, nirajan.GET)
 	http.ListenAndServe("0.0.0.0:8080", r)
-}
 
+}
 ```
 
 - in the memory of nirajan dhakal (he is not dead)
