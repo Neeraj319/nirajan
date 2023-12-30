@@ -314,6 +314,10 @@ func callHandler(handler interface{}, pathArray []string, handerObj *RouteHandle
 
 func (r *SimpleRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	url := req.URL.String()
+	i := strings.IndexRune(url, '?')
+	if i != -1 {
+		url = url[:i]
+	}
 	pathArray := strings.Split(url, "/")
 	pathArray = removeBlankStrings(pathArray)
 
