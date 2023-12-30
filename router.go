@@ -1,13 +1,13 @@
-package main
+package nirajan
 
 import (
-	// "fmt"
 	"fmt"
-	"github.com/gorilla/schema"
 	"net/http"
 	"reflect"
 	"runtime"
 	"strings"
+
+	"github.com/gorilla/schema"
 )
 
 type HTTP_METHOD int
@@ -134,34 +134,46 @@ func validateHandlerParams(function interface{}) {
 
 	v := reflect.TypeOf(function)
 
-	_, file, line, _ := runtime.Caller(1)
-
-	errorTemplate := "[%s:%d] %s: %s"
+	errorTemplate := "%s: %s"
 
 	if !(v.NumIn() == 3 || v.NumIn() == 2) {
-		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler function params must be 2 or 3"))
+		panic(fmt.Sprintf(errorTemplate, functionName, "handler function params must be 2 or 3"))
 	}
 
 	if v.In(0).Kind() != reflect.Interface || v.In(0).String() != "http.ResponseWriter" {
-		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler first argument must be of type `http.ResponseWriter`"))
+		panic(fmt.Sprintf(errorTemplate, functionName, "handler first argument must be of type `http.ResponseWriter`"))
 	}
 
 	if v.In(1).Kind() != reflect.Ptr || v.In(1).Elem().String() != "http.Request" {
-		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler second argument must be a pointer to `http.Request`"))
+		panic(fmt.Sprintf(errorTemplate, functionName, "handler second argument must be a pointer to `http.Request`"))
 	}
 
 	if v.NumIn() == 3 && v.In(2).Kind() != reflect.Struct {
-		panic(fmt.Sprintf(errorTemplate, file, line, functionName, "handler third argument must be a struct"))
+		panic(fmt.Sprintf(errorTemplate, functionName, "handler third argument must be a struct"))
 	}
 }
 
-func validateHandlerStruct() {
-
+func validateHandlerParamStructAttrs(function interface{}, pathParams map[string]int, path string) {
+	v := reflect.TypeOf(function)
+	if v.NumIn() != 3 {
+		return
+	}
+	paramStruct := v.In(2)
+	structName := paramStruct.Name()
+	erro_template := "Field '%s' of struct '%s' not present in path `%s` \n"
+	for i := 0; i < paramStruct.NumField(); i++ {
+		fieldName := paramStruct.Field(i).Name
+		if _, ok := pathParams[fieldName]; !ok {
+			panic(fmt.Sprintf(erro_template, fieldName, structName, path))
+		}
+	}
 }
 
 func (r *SimpleRouter) addRoute(path string, function interface{}, http_method HTTP_METHOD) {
 	pathParams := make(map[string]int)
 	routeHandler := createRouteHandler(http_method)
+
+	var pathName string
 	if strings.Contains(path, ":") {
 		var pathName string = ""
 		for index, value := range strings.Split(path, "/") {
@@ -174,16 +186,16 @@ func (r *SimpleRouter) addRoute(path string, function interface{}, http_method H
 				pathName += "/" + value
 			}
 		}
-		path = pathName
 	}
 	if path == "" {
-		path = "/"
+		pathName = "/"
 	}
 
 	validateHanlder(function)
+	validateHandlerParamStructAttrs(function, pathParams, path)
 
 	routeHandler.pathParams = pathParams
-	routeHandler.route = path
+	routeHandler.route = pathName
 	removeSimilarRoute(&r.routeMapping, *routeHandler)
 	r.routeMapping[routeHandler] = function
 }
