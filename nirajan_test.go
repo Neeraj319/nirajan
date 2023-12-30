@@ -1,7 +1,6 @@
 package nirajan
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,9 +20,6 @@ func TestSimpleRouter(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	}, GET)
-	for routeObj := range router.routeMapping {
-		fmt.Println(routeObj.route, routeObj.pathParams)
-	}
 
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
