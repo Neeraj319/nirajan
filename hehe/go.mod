@@ -1,4 +1,4 @@
-module github.com/Neeraj319/test/nirajan
+module github.com/Neeraj319/heh/nirajan
 
 go 1.21.4
 

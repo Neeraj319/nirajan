@@ -2,13 +2,12 @@ package nirajan
 
 import (
 	"fmt"
+	"github.com/gorilla/schema"
 	"net/http"
 	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
-
-	"github.com/gorilla/schema"
 )
 
 type HTTP_METHOD int
